@@ -1,15 +1,11 @@
-package main
+package semaphore
 
 import (
-	"fmt"
-	"math/rand"
 	"sync"
-	"time"
 )
 
-// Semaphore implementation
-
-type semaphore struct {
+// Semaphore naive implementation
+type Semaphore struct {
 	capacity int
 
 	count int
@@ -17,13 +13,13 @@ type semaphore struct {
 	condition chan bool
 }
 
-// Acquire blocks the caller if thread capacity has been reached or returns otherwise
-func (s *semaphore) Acquire() {
+// Wait returns immediately or blocks until a Signal(), increments the semaphore
+func (s *Semaphore) Wait() {
 	s.Lock()
 	defer s.Unlock()
 
-	// Blocking the caller without keeping the Semaphore locked to other threads
-	if s.count == s.capacity {
+	// When waking, check that the condition still holds
+	for s.count == s.capacity {
 		s.Unlock()
 		<-s.condition
 		s.Lock()
@@ -33,11 +29,13 @@ func (s *semaphore) Acquire() {
 
 }
 
-// Release uses a non-blocking send to prevent deadlock when there are no more threads waiting on the channel in Acquire
-func (s *semaphore) Release() {
+// Signal returns immediately, decrements the semaphore and wakes one waiting thread
+func (s *Semaphore) Signal() {
 	s.Lock()
 	defer s.Unlock()
+
 	s.count--
+
 	select {
 	case s.condition <- true:
 	default:
@@ -45,37 +43,7 @@ func (s *semaphore) Release() {
 
 }
 
-func newSemaphore(capacity int) *semaphore {
-	return &semaphore{count: 0, capacity: capacity, condition: make(chan bool)}
-}
-
-func worker(id int, sem *semaphore, wg *sync.WaitGroup) {
-	sem.Acquire()
-	n := time.Duration(rand.Intn(4)+1) * time.Second
-	fmt.Println(id, "acquired sem for ", n)
-	time.Sleep(n)
-	sem.Release()
-	wg.Done()
-
-}
-
-func main() {
-
-	threads := 10
-	sem := newSemaphore(3)
-	wg := sync.WaitGroup{}
-
-	for i := 1; i <= threads; i++ {
-		wg.Add(1)
-		go worker(i, sem, &wg)
-	}
-
-	wg.Wait()
-	threads = 25
-
-	for i := 1; i <= threads; i++ {
-		wg.Add(1)
-		go worker(i, sem, &wg)
-	}
-	wg.Wait()
+// NewSemaphore constructor
+func NewSemaphore(n int) *Semaphore {
+	return &Semaphore{count: 0, capacity: n, condition: make(chan bool)}
 }
