@@ -2,42 +2,8 @@ package main
 
 import (
 	"sync"
+	"tutorials/concurrency/concurrency/patterns/semaphore"
 )
-
-type semaphore struct {
-	capacity int
-
-	count int
-	sync.Mutex
-	condition chan bool
-}
-
-func (s *semaphore) Wait() {
-	s.Lock()
-	defer s.Unlock()
-	if s.count == s.capacity {
-		s.Unlock()
-		<-s.condition
-		s.Lock()
-	}
-
-	s.count++
-
-}
-func (s *semaphore) Signal() {
-	s.Lock()
-	defer s.Unlock()
-	s.count--
-	select {
-	case s.condition <- true:
-	default:
-	}
-
-}
-
-func newSemaphore(capacity int) *semaphore {
-	return &semaphore{count: 0, capacity: capacity, condition: make(chan bool)}
-}
 
 /*
  	Barrier is a generalized rendezvous that can sync parts of code between N threads
@@ -51,13 +17,13 @@ func newSemaphore(capacity int) *semaphore {
 type reusableBarrier struct {
 	n             int
 	threadCount   int
-	firstBarrier  *semaphore
-	secondBarrier *semaphore
+	firstBarrier  *semaphore.Semaphore
+	secondBarrier *semaphore.Semaphore
 	sync.Mutex
 }
 
 func newReusableBarrier(n int) *reusableBarrier {
-	return &reusableBarrier{n: n, threadCount: 0, firstBarrier: newSemaphore(0), secondBarrier: newSemaphore(0)}
+	return &reusableBarrier{n: n, threadCount: 0, firstBarrier: semaphore.NewSemaphore(0), secondBarrier: semaphore.NewSemaphore(0)}
 }
 
 func (rb *reusableBarrier) first() {
